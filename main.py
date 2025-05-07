@@ -3,6 +3,8 @@ from mcp.server.fastmcp import FastMCP
 import pandas as pd
 import subprocess
 import os
+from typing import Optional
+from pricing_calculator import PricingCalculator
 
 # Create an MCP server
 mcp = FastMCP("Demo")
@@ -12,6 +14,46 @@ mcp = FastMCP("Demo")
 #   - If FILE_PATH is set: FILE_PATH="/data/files" -> uses "/data/files"
 #   - If FILE_PATH is not set: -> uses user's home directory (e.g., "/Users/username")
 FILE_PATH = os.getenv("FILE_PATH", os.path.expanduser("~"))
+
+@mcp.tool()
+def calculate_concurrent_price(concurrent_docs: int, config_path: Optional[str] = None) -> str:
+    """Calculate price based on number of concurrent documents
+
+    Pricing rules are loaded from external configuration file.
+    The price is calculated based on different tiers of concurrent document counts.
+    The pricing rules file should be located at $FILE_PATH/config/pricing_rules.json
+    or can be specified via config_path parameter.
+
+    Args:
+        concurrent_docs: Number of concurrent documents to calculate price for
+        config_path: Optional custom path to pricing rules JSON file
+
+    Returns:
+        str: Detailed price calculation result including breakdown by pricing tiers
+    """
+    try:
+        # Create a new calculator instance for each calculation
+        calculator = PricingCalculator(config_path)
+        total_cost, calculation_details = calculator.calculate_cost(concurrent_docs)
+
+        # Format detailed response
+        response = [f"Price calculation for {concurrent_docs} concurrent documents:"]
+        response.append("\nBreakdown by pricing tiers:")
+
+        for detail in calculation_details:
+            response.append(
+                f"- {detail['tier']}: "
+                f"{detail['docs_in_tier']} docs × ¥{detail['price_per_unit']:.2f} = "
+                f"¥{detail['tier_cost']:.2f}"
+            )
+
+        response.append(f"\nTotal price: ¥{total_cost:.2f}")
+        response.append(f"Average price per document: ¥{(total_cost/concurrent_docs):.2f}")
+
+        return "\n".join(response)
+
+    except Exception as e:
+        raise ValueError(f"Error calculating price: {str(e)}")
 
 # Add Excel to CSV conversion tool
 @mcp.tool()
@@ -106,6 +148,9 @@ def open_wireshark(pcap_file: str = None) -> str:
     except Exception as e:
         raise ValueError(f"Error opening Wireshark: {str(e)}")
 
-if __name__ == "__main__":
-    # Initialise and run the server
+def main():
+    """Entry point for the MCP Ops Toolkit"""
     mcp.run(transport='stdio')
+
+if __name__ == "__main__":
+    main()
