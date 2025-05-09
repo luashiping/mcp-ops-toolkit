@@ -4,7 +4,7 @@ import pandas as pd
 import subprocess
 import os
 from typing import Optional
-from pricing_calculator import PricingCalculator
+from .pricing_calculator import PricingCalculator
 
 # Create an MCP server
 mcp = FastMCP("Demo")
